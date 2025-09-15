@@ -20,12 +20,21 @@ export default async function handler(req, res) {
       });
     }
 
+    // LOGS DE DEBUG ADICIONADOS:
+    console.log(`[API] === PROCESSANDO BIGPOINTS ===`);
+    console.log(`[API] Email: ${email}`);
+    console.log(`[API] Data recebida: ${date}`);
+    console.log(`[API] Amount: ${amount}`);
+    console.log(`[API] Timestamp do servidor (UTC): ${new Date().toISOString()}`);
+    console.log(`[API] Data/hora do servidor (local): ${new Date().toString()}`);
+    console.log(`[API] Timezone do servidor: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
+
     // Valida o ID token do Firebase Auth
     let decodedToken;
     try {
       decodedToken = await auth.verifyIdToken(idToken);
     } catch (authError) {
-      console.error('Erro na autenticação:', authError);
+      console.error('[API] Erro na autenticação:', authError);
       return res.status(401).json({
         success: false,
         message: 'Token de autenticação inválido'
@@ -34,6 +43,7 @@ export default async function handler(req, res) {
 
     // Verifica se o email do token bate com o email enviado
     if (decodedToken.email !== email) {
+      console.log(`[API] ERRO: Email não corresponde - Token: ${decodedToken.email}, Enviado: ${email}`);
       return res.status(403).json({
         success: false,
         message: 'Email não corresponde ao token de autenticação'
@@ -43,6 +53,7 @@ export default async function handler(req, res) {
     // Validação dos valores
     const numericAmount = parseFloat(amount);
     if (isNaN(numericAmount) || numericAmount < 0) {
+      console.log(`[API] ERRO: Amount inválido: ${amount}`);
       return res.status(400).json({
         success: false,
         message: 'Quantidade deve ser um número positivo'
@@ -52,6 +63,7 @@ export default async function handler(req, res) {
     // Validação da data (formato YYYY-MM-DD)
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!dateRegex.test(date)) {
+      console.log(`[API] ERRO: Formato de data inválido: ${date}`);
       return res.status(400).json({
         success: false,
         message: 'Formato de data inválido. Use YYYY-MM-DD'
@@ -60,6 +72,7 @@ export default async function handler(req, res) {
 
     // Limite de segurança (máximo 1000 BIG Points por dia)
     if (numericAmount > 1000) {
+      console.log(`[API] ERRO: Quantidade excede limite: ${numericAmount}`);
       return res.status(400).json({
         success: false,
         message: 'Quantidade excede limite máximo diário (1000 BIG Points)'
@@ -72,6 +85,8 @@ export default async function handler(req, res) {
       .doc(userId)
       .collection('bigpoints_earnings')
       .doc(date);
+
+    console.log(`[API] Referência do documento: users/${userId}/bigpoints_earnings/${date}`);
 
     // Verifica se já existe documento para esta data
     const existingDoc = await docRef.get();
@@ -92,7 +107,7 @@ export default async function handler(req, res) {
         lastUpdate: new Date().toISOString()
       });
 
-      console.log(`BIG Points atualizados para ${email} em ${date}: ${currentAmount} → ${newAmount}`);
+      console.log(`[API] ✅ BIG Points atualizados para ${email} em ${date}: ${currentAmount} → ${newAmount}`);
       
       return res.status(200).json({
         success: true,
@@ -115,7 +130,7 @@ export default async function handler(req, res) {
         email: email
       });
 
-      console.log(`Novo registro de BIG Points criado para ${email} em ${date}: ${numericAmount}`);
+      console.log(`[API] ✅ Novo registro de BIG Points criado para ${email} em ${date}: ${numericAmount}`);
       
       return res.status(201).json({
         success: true,
@@ -129,7 +144,7 @@ export default async function handler(req, res) {
     }
 
   } catch (error) {
-    console.error('Erro no endpoint /api/bigpoints:', error);
+    console.error('[API] ❌ Erro no endpoint /api/bigpoints:', error);
     
     return res.status(500).json({
       success: false,
