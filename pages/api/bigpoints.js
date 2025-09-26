@@ -70,12 +70,14 @@ export default async function handler(req, res) {
       });
     }
 
-    // Limite de segurança (máximo 1000 BIG Points por dia)
-    if (numericAmount > 1000) {
-      console.log(`[API] ERRO: Quantidade excede limite: ${numericAmount}`);
+    // Limite de segurança configurável (proteção contra valores absurdos)
+    const MAX_DAILY_BIGPOINTS = process.env.MAX_DAILY_BIGPOINTS || 100000; // 100k como padrão
+    
+    if (numericAmount > MAX_DAILY_BIGPOINTS) {
+      console.log(`[API] ERRO: Quantidade excede limite de segurança: ${numericAmount} > ${MAX_DAILY_BIGPOINTS}`);
       return res.status(400).json({
         success: false,
-        message: 'Quantidade excede limite máximo diário (1000 BIG Points)'
+        message: `Quantidade excede limite máximo de segurança (${MAX_DAILY_BIGPOINTS} BIG Points)`
       });
     }
 
