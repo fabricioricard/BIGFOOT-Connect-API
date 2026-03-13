@@ -1,7 +1,6 @@
 const { db, auth } = require('../../lib/firebaseAdmin');
 
-export default async function handler(req, res) {
-  // Apenas métodos POST são permitidos
+module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ 
       success: false, 
@@ -12,7 +11,6 @@ export default async function handler(req, res) {
   try {
     const { email, date, amount, idToken } = req.body;
 
-    // Validação dos dados recebidos
     if (!email || !date || amount === undefined || !idToken) {
       return res.status(400).json({
         success: false,
@@ -20,16 +18,13 @@ export default async function handler(req, res) {
       });
     }
 
-    // LOGS DE DEBUG ADICIONADOS:
     console.log(`[API] === PROCESSANDO BIGPOINTS ===`);
     console.log(`[API] Email: ${email}`);
     console.log(`[API] Data recebida: ${date}`);
     console.log(`[API] Amount: ${amount}`);
     console.log(`[API] Timestamp do servidor (UTC): ${new Date().toISOString()}`);
-    console.log(`[API] Data/hora do servidor (local): ${new Date().toString()}`);
     console.log(`[API] Timezone do servidor: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
 
-    // Valida o ID token do Firebase Auth
     let decodedToken;
     try {
       decodedToken = await auth.verifyIdToken(idToken);
@@ -41,7 +36,6 @@ export default async function handler(req, res) {
       });
     }
 
-    // Verifica se o email do token bate com o email enviado
     if (decodedToken.email !== email) {
       console.log(`[API] ERRO: Email não corresponde - Token: ${decodedToken.email}, Enviado: ${email}`);
       return res.status(403).json({
@@ -50,31 +44,24 @@ export default async function handler(req, res) {
       });
     }
 
-    // Validação dos valores
     const numericAmount = parseFloat(amount);
     if (isNaN(numericAmount) || numericAmount < 0) {
-      console.log(`[API] ERRO: Amount inválido: ${amount}`);
       return res.status(400).json({
         success: false,
         message: 'Quantidade deve ser um número positivo'
       });
     }
 
-    // Validação da data (formato YYYY-MM-DD)
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!dateRegex.test(date)) {
-      console.log(`[API] ERRO: Formato de data inválido: ${date}`);
       return res.status(400).json({
         success: false,
         message: 'Formato de data inválido. Use YYYY-MM-DD'
       });
     }
 
-    // Limite de segurança configurável (proteção contra valores absurdos)
-    const MAX_DAILY_BIGPOINTS = process.env.MAX_DAILY_BIGPOINTS || 100000; // 100k como padrão
-    
+    const MAX_DAILY_BIGPOINTS = process.env.MAX_DAILY_BIGPOINTS || 100000;
     if (numericAmount > MAX_DAILY_BIGPOINTS) {
-      console.log(`[API] ERRO: Quantidade excede limite de segurança: ${numericAmount} > ${MAX_DAILY_BIGPOINTS}`);
       return res.status(400).json({
         success: false,
         message: `Quantidade excede limite máximo de segurança (${MAX_DAILY_BIGPOINTS} BIG Points)`
@@ -90,17 +77,10 @@ export default async function handler(req, res) {
 
     console.log(`[API] Referência do documento: users/${userId}/bigpoints_earnings/${date}`);
 
-    // Verifica se já existe documento para esta data
     const existingDoc = await docRef.get();
     
     if (existingDoc.exists) {
-      // Atualiza documento existente (incrementa ou substitui)
       const currentAmount = existingDoc.data().bigpoints || 0;
-      
-      // Opção 1: Incrementar (soma com valor existente)
-      // const newAmount = currentAmount + numericAmount;
-      
-      // Opção 2: Substituir (usa novo valor - recomendado para total absoluto)
       const newAmount = numericAmount;
       
       await docRef.update({
@@ -114,40 +94,29 @@ export default async function handler(req, res) {
       return res.status(200).json({
         success: true,
         message: 'BIG Points atualizados com sucesso',
-        data: {
-          date,
-          previousAmount: currentAmount,
-          newAmount: newAmount,
-          added: numericAmount
-        }
+        data: { date, previousAmount: currentAmount, newAmount, added: numericAmount }
       });
       
     } else {
-      // Cria novo documento
       await docRef.set({
         bigpoints: numericAmount,
         createdAt: new Date(),
         updatedAt: new Date(),
-        userId: userId,
-        email: email
+        userId,
+        email
       });
 
-      console.log(`[API] ✅ Novo registro de BIG Points criado para ${email} em ${date}: ${numericAmount}`);
+      console.log(`[API] ✅ Novo registro criado para ${email} em ${date}: ${numericAmount}`);
       
       return res.status(201).json({
         success: true,
         message: 'BIG Points registrados com sucesso',
-        data: {
-          date,
-          amount: numericAmount,
-          created: true
-        }
+        data: { date, amount: numericAmount, created: true }
       });
     }
 
   } catch (error) {
     console.error('[API] ❌ Erro no endpoint /api/bigpoints:', error);
-    
     return res.status(500).json({
       success: false,
       message: 'Erro interno do servidor',
